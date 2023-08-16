@@ -1,8 +1,12 @@
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
-const { mongoose } = require("mongoose");
-const User = mongoose.model("User");
+const mongoose = require("mongoose");
 const mappedUser = require("../helpers/reqMapper");
+const md5 = require("md5");
+
+const User = require("../models/userSchema");
+const Address = require("../models/addressSchema");
+const AccessToken = require("../models/accessTokenSechma");
 
 const registerController = async (req, res) => {
   const errors = validationResult(req);
@@ -142,7 +146,13 @@ const loginController = async (req, res) => {
       .status(404)
       .json({ code: "User-Not-Found", error: "User not found" });
   }
-  const access_token = existUserName._id.toString();
+  const access_token = md5(existUserName._id.toString());
+  const accesstoken = new AccessToken();
+  accesstoken.userId = existUserName._id;
+  accesstoken.accessToken = access_token;
+
+  await accesstoken.save();
+
   const comparePassword = await bcrypt.compare(
     password,
     existUserName.password
@@ -165,15 +175,21 @@ const getUser = async (req, res) => {
     const existUser = await User.findById({ _id: req.User._id }).select({
       password: 0,
     });
+
     if (!existUser) {
       return res
         .status(400)
         .json({ code: "User-Not-Found", error: "User does not exists " });
     }
+
+    const address = await Address.find({ user_id: existUser._id });
+
+    existUser.address = address.map((ele) => ele.address);
+
     return res.status(200).json({
       code: "Success",
       message: "User exists",
-      user: existUser,
+      user: { existUser, address: existUser.address },
     });
   } catch (error) {
     console.error(error.toString());
@@ -239,10 +255,41 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const createAddress = async (req, res) => {
+  try {
+    const { address, city, state, pin_code, phone_no } = req.body;
+    const userId = req.User._id;
+
+    if (!address || !city || !state || !pin_code || !phone_no) {
+      return res
+        .status(400)
+        .json({ code: "Invalid_Input", error: "Please fill all feilds" });
+    }
+    const newAddress = new Address({
+      user_id: userId,
+      address,
+      city,
+      state,
+      pin_code,
+      phone_no,
+    });
+
+    await newAddress.save();
+
+    res.json({ code: "Address-Created-Successfully", data: newAddress });
+  } catch (error) {
+    console.error(error.toString());
+  }
+};
+
+const getUserWithId = async (req, res) => {};
+
 module.exports = {
   registerController,
   loginController,
   getUser,
   getUsers,
   deleteUser,
+  createAddress,
+  getUserWithId,
 };
