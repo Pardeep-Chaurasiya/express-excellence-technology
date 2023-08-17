@@ -183,13 +183,12 @@ const getUser = async (req, res) => {
     }
 
     const address = await Address.find({ user_id: existUser._id });
-
-    existUser.address = address.map((ele) => ele.address);
+    existUser.address = address;
 
     return res.status(200).json({
       code: "Success",
       message: "User exists",
-      user: { existUser, address: existUser.address },
+      user: { existUser },
     });
   } catch (error) {
     console.error(error.toString());
@@ -274,7 +273,13 @@ const createAddress = async (req, res) => {
       phone_no,
     });
 
-    await newAddress.save();
+    const savedAddress = await newAddress.save();
+
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { addresses: savedAddress._id } },
+      { new: true, upsert: true }
+    );
 
     res.json({ code: "Address-Created-Successfully", data: newAddress });
   } catch (error) {
@@ -282,7 +287,16 @@ const createAddress = async (req, res) => {
   }
 };
 
-const getUserWithId = async (req, res) => {};
+const getUserWithId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existUser = await User.findById(id).populate("addresses", "address");
+    return res.json({ existUser });
+  } catch (error) {
+    console.error(error.toString());
+  }
+};
 
 module.exports = {
   registerController,

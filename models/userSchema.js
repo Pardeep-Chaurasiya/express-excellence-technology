@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  addresses: [
+    {
+      type: ObjectId,
+      ref: "Address",
+    },
+  ],
 });
 
 const User = mongoose.model("User", userSchema);

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Schema.Types;
 
-const expireIn = new Date(Date.now() + 60 * 60 * 1000);
+// const expireIn = new Date(Date.now() + 60 * 60 * 1000);
 
 const accessTokenSchema = new mongoose.Schema({
   userId: {
