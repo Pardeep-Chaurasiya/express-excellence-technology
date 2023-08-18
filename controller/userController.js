@@ -3,6 +3,7 @@ const { validationResult } = require("express-validator");
 const mongoose = require("mongoose");
 const mappedUser = require("../helpers/reqMapper");
 const md5 = require("md5");
+const jwt = require("jsonwebtoken");
 
 const User = require("../models/userSchema");
 const Address = require("../models/addressSchema");
@@ -146,10 +147,16 @@ const loginController = async (req, res) => {
       .status(404)
       .json({ code: "User-Not-Found", error: "User not found" });
   }
-  const access_token = md5(existUserName._id.toString());
+
+  const token = await jwt.sign(
+    { _id: existUserName._id },
+    process.env.JWT_SECRET_KEY
+  );
+
+  // const access_token = md5(existUserName._id.toString());
   const accesstoken = new AccessToken();
   accesstoken.userId = existUserName._id;
-  accesstoken.accessToken = access_token;
+  accesstoken.accessToken = token;
 
   await accesstoken.save();
 
@@ -166,7 +173,7 @@ const loginController = async (req, res) => {
   return res.status(200).json({
     code: "Success",
     message: "Login successfully",
-    data: { access_token },
+    data: { token },
   });
 };
 
@@ -292,9 +299,48 @@ const getUserWithId = async (req, res) => {
     const { id } = req.params;
 
     const existUser = await User.findById(id).populate("addresses", "address");
-    return res.json({ existUser });
+    console.log(existUser);
+    return res.status(200).json({
+      code: "Valid-User",
+      message: "User exist in this id",
+      existUser,
+    });
   } catch (error) {
     console.error(error.toString());
+    return res
+      .status(400)
+      .json({ code: "Invalid-User", error: "User not found" });
+  }
+};
+
+const deleteAddress = async (req, res) => {
+  try {
+    const userId = req.User._id;
+    const address = req.User.addresses.toString();
+    const addressArray = address.split(",");
+    const deleteaddress = await Address.deleteMany({
+      _id: { $in: addressArray },
+    });
+    const userUpdateResult = await User.updateOne(
+      { _id: userId },
+      { $pull: { addresses: { $in: addressArray } } }
+    );
+    if (!deleteaddress) {
+      return res.status(200).json({
+        code: "Address-Deletion-Failed",
+        message: "Address deletion failed or user not updated",
+      });
+    }
+    return res.status(200).json({
+      code: "Deletion-Successfully",
+      message: "User Address Deleted successfully",
+    });
+    console.log(deleteaddress);
+  } catch (error) {
+    console.log(error.toString());
+    return res
+      .status(400)
+      .json({ code: "Something-Went-Wrong", message: "Deletion is not done" });
   }
 };
 
@@ -306,4 +352,5 @@ module.exports = {
   deleteUser,
   createAddress,
   getUserWithId,
+  deleteAddress,
 };

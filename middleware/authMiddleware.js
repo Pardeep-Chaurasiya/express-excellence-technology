@@ -1,37 +1,39 @@
-const { mongoose, isValidObjectId } = require("mongoose");
+const jwt = require("jsonwebtoken");
 const User = require("../models/userSchema");
-const accessToken = require("../models/accessTokenSechma");
+const secretKey = process.env.JWT_SECRET_KEY;
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const { access_token } = req.headers;
-    if (!access_token) {
+    const { authorization } = req.headers;
+    if (!authorization) {
       return res.status(401).json({
-        code: "Invalid-Token ",
-        error: "Please provide Valid access token",
+        code: "Invalid-Token",
+        error: "Please provide a valid JWT token",
       });
     }
 
-    const validAccessToken = await accessToken.findOne({
-      accessToken: access_token,
-    });
+    const token = authorization.split(" ")[1];
 
-    if (!validAccessToken) {
-      return res.status(400).json({
-        code: "User-Not-Logged-In",
-        message: "Please login first to access this resource",
+    let decodedToken;
+    try {
+      decodedToken = jwt.verify(authorization, secretKey);
+    } catch (error) {
+      return res.status(401).json({
+        code: "Unauthorized",
+        error: "Invalid token or token expired",
       });
     }
-    const existUser = await User.findById({
-      _id: validAccessToken.userId,
-    }).select({
+
+    const existUser = await User.findById(decodedToken._id).select({
       password: 0,
     });
+
     if (!existUser) {
       return res
         .status(401)
-        .json({ code: "Unauthorized", error: "User does not exists " });
+        .json({ code: "Unauthorized", error: "User does not exist" });
     }
+
     req.User = existUser;
     next();
   } catch (error) {
