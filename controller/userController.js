@@ -1,13 +1,12 @@
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
-const mongoose = require("mongoose");
 const mappedUser = require("../helpers/reqMapper");
-const md5 = require("md5");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/userSchema");
 const Address = require("../models/addressSchema");
 const AccessToken = require("../models/accessTokenSechma");
+const sendEmail = require("../utils/sendEmail");
 
 const registerController = async (req, res) => {
   const errors = validationResult(req);
@@ -74,64 +73,6 @@ const registerController = async (req, res) => {
       .json({ code: "Internal-Server-Error", error: "Internal server error" });
   }
 };
-
-// const registerController = async (req, res) => {
-//   const { firstName, lastName, userName, email, password, confirmPassword } =
-//     req.body;
-//   if (
-//     !firstName ||
-//     !lastName ||
-//     !userName ||
-//     !email ||
-//     !password ||
-//     !confirmPassword
-//   ) {
-//     return res
-//       .status(422)
-//       .json({ code: "Invalid-Input", error: "Please fill all feilds" });
-//   }
-
-//   const existEmail = await User.findOne({ email });
-//   const existUserName = await User.findOne({ userName });
-//   if (existEmail) {
-//     return res
-//       .status(400)
-//       .json({ code: "Invalid-Input", error: "Email already exists!!" });
-//   }
-//   if (existUserName) {
-//     return res
-//       .status(400)
-//       .json({ code: "Invalid-Input", error: "Username already exists!!" });
-//   }
-//   const salt = 10;
-//   const hashPassword = await bcrypt.hash(password, salt);
-//   if (password !== confirmPassword) {
-//     return res.status(400).json({
-//       code: "Invalid-Input",
-//       error: "Password and Confirm Password does't matched !!",
-//     });
-//   }
-//   const newUser = new User({
-//     firstName,
-//     lastName,
-//     userName,
-//     email,
-//     password: hashPassword,
-//   });
-
-//   const saveUser = await newUser.save();
-//   delete saveUser.password;
-
-//   if (!saveUser) {
-//     return res
-//       .status(400)
-//       .json({ code: "", error: "Something went wrong while register user" });
-//   }
-//   return res.status(200).json({
-//     message: "User Register Successfully !!",
-//     User: mappedUser(saveUser),
-//   });
-// };
 
 const loginController = async (req, res) => {
   const { userName, password } = req.body;
@@ -344,6 +285,70 @@ const deleteAddress = async (req, res) => {
   }
 };
 
+const forgetPassword = async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const resetToken = jwt.sign({ _id: user._id }, process.env.JWT_RESET_KEY, {
+    expiresIn: "15m",
+  });
+
+  const data = await User.updateOne(
+    { email },
+    { $set: { resetToken: resetToken } }
+  );
+
+  sendEmail(user.firstName, email, resetToken);
+
+  res.status(200).json({
+    code: "Reset-Token-Sent",
+    message: "Please check your mail for password reset",
+    data,
+  });
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    const { resetToken } = req.params;
+
+    const decoded = jwt.verify(resetToken, process.env.JWT_RESET_KEY);
+
+    if (!password || !confirmPassword) {
+      return res
+        .status(400)
+        .json({ code: "Invalid-Feilds", message: "Please fill all feilds" });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        code: "Invalid-Input",
+        message: "Password and confirm password does not matched",
+      });
+    }
+
+    const user = await User.findById(decoded._id);
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    return res
+      .status(204)
+      .json({ success: true, message: "This is already used " });
+  }
+};
+
+const profileImage = async (req, res) => {};
+
 module.exports = {
   registerController,
   loginController,
@@ -353,4 +358,7 @@ module.exports = {
   createAddress,
   getUserWithId,
   deleteAddress,
+  forgetPassword,
+  resetPassword,
+  profileImage,
 };
