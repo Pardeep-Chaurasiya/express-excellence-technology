@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
 const mappedUser = require("../helpers/reqMapper");
 const jwt = require("jsonwebtoken");
+const cloudinary = require("../utils/cloudinary");
 
 const User = require("../models/userSchema");
 const Address = require("../models/addressSchema");
@@ -94,7 +95,6 @@ const loginController = async (req, res) => {
     process.env.JWT_SECRET_KEY
   );
 
-  // const access_token = md5(existUserName._id.toString());
   const accesstoken = new AccessToken();
   accesstoken.userId = existUserName._id;
   accesstoken.accessToken = token;
@@ -276,7 +276,6 @@ const deleteAddress = async (req, res) => {
       code: "Deletion-Successfully",
       message: "User Address Deleted successfully",
     });
-    console.log(deleteaddress);
   } catch (error) {
     console.log(error.toString());
     return res
@@ -347,7 +346,34 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const profileImage = async (req, res) => {};
+const profileImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image provided" });
+    }
+    res.json({ message: "Profile image uploaded successfully" });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+const cloudinaryUpload = async (req, res) => {
+  try {
+    const result = await cloudinary.uploader.upload(req.file.path);
+    const userId = req.User._id;
+    const uploadFile = await User.findByIdAndUpdate(
+      userId,
+      { $push: { files: result.url } },
+      { new: true, upsert: true }
+    ).select({ password: 0 });
+    res.json({
+      code: "File-Upload-Successfully",
+      data: uploadFile,
+    });
+  } catch (error) {
+    res.status(400).json({ message: "file not upload", error: error.message });
+  }
+};
 
 module.exports = {
   registerController,
@@ -361,4 +387,5 @@ module.exports = {
   forgetPassword,
   resetPassword,
   profileImage,
+  cloudinaryUpload,
 };

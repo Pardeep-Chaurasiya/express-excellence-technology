@@ -1,6 +1,7 @@
 const express = require("express");
 const userController = require("../controller/userController");
 const authMiddleware = require("../middleware/authMiddleware");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
@@ -17,6 +18,17 @@ router.put(
   "/user/verify-reset-password/:resetToken",
   userController.resetPassword
 );
-router.put("/user/profile-image", userController.profileImage);
+router.put(
+  "/user/profile-image",
+  authMiddleware,
+  upload.single("profileImage"),
+  userController.profileImage
+);
+router.post(
+  "/user/upload",
+  authMiddleware,
+  upload.single("file"),
+  userController.cloudinaryUpload
+);
 
 module.exports = router;

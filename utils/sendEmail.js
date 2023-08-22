@@ -24,7 +24,6 @@ const resetPasswordMail = async (name, email, resetToken) => {
         console.log(err.message);
         return;
       }
-      console.log("Email has been sent :- ", info.response);
       transporter.close();
     });
   } catch (error) {
