@@ -9,7 +9,13 @@ app.use(express.json());
 
 require("./models/userSchema");
 const userRoute = require("./routes/userRoutes");
+const authRoute = require("./routes/authRoutes");
+const addressRoute = require("./routes/addressRoutes");
+
 app.use("/", userRoute);
+app.use("/", authRoute);
+app.use("/", addressRoute);
+
 app.use(
   expressFileUpload({
     useTempFiles: true,
